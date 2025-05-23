@@ -5,10 +5,17 @@ metadata:
   name: test-terraform-outputs
   namespace: default
 spec:
-  s3Backend:
-    bucket: "test-tf-operator" # Replace with your bucket
-    key: "test/terraform.tfstate"
-    region: "eu-central-1" # Replace with your region
+  backends:
+    - type: "s3" # Specify the backend type
+      source:
+        bucket: "test-tf-operator"
+        key: "test/terraform.tfstate"
+        region: "eu-central-1"
+    - type: "s3"
+      source:
+        bucket: "test-tf-operator"
+        key: "test/terraform-one.tfstate"
+        region: "eu-central-1"
   syncInterval: "30s" # Fast sync for testing
   target:
     namespace: "default"

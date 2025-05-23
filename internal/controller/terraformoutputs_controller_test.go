@@ -51,7 +51,31 @@ var _ = Describe("TerraformOutputs Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: outputsv1alpha1.TerraformOutputsSpec{
+						Backends: []outputsv1alpha1.BackendSpec{
+							{
+								Type: "s3",
+								Source: outputsv1alpha1.S3Spec{
+									Bucket: "test-bucket-1",
+									Key:    "test-key-1.tfstate",
+									Region: "us-east-1",
+								},
+							},
+							{
+								Type: "s3",
+								Source: outputsv1alpha1.S3Spec{
+									Bucket: "test-bucket-2",
+									Key:    "test-key-2.tfstate",
+									Region: "us-west-2",
+								},
+							},
+						},
+						Target: outputsv1alpha1.TargetSpec{
+							Namespace:     "default",
+							ConfigMapName: "test-configmap",
+							SecretName:    "test-secret",
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

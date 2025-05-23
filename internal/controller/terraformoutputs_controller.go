@@ -50,8 +50,8 @@ type TerraformOutput struct {
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 const (
-	// ETagAnnotation stores the S3 object ETag to detect changes
-	ETagAnnotation = "terraform-outputs.tfoutputs.io/s3-etag"
+	// ETagAnnotationPrefix stores the S3 object ETag to detect changes for each backend
+	ETagAnnotationPrefix = "terraform-outputs.tfoutputs.io/s3-etag-"
 )
 
 // Reconcile handles the reconciliation loop
@@ -89,31 +89,25 @@ func (r *TerraformOutputsReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 		}
 
-		// Check if S3 object has changed by comparing ETags
-		currentETag, err := r.getS3ObjectETag(ctx, &terraformOutputs)
+		// Check if any S3 objects have changed by comparing ETags
+		hasChanges, _, err := r.checkBackendChanges(ctx, &terraformOutputs)
 		if err != nil {
-			logger.Error(err, "Failed to get S3 object ETag")
+			logger.Error(err, "Failed to check backend changes")
 			// Update status to Failed with retry
 			r.updateStatusWithRetry(ctx, req.NamespacedName, func(tfOutputs *outputsv1alpha1.TerraformOutputs) {
 				tfOutputs.Status.SyncStatus = "Failed"
-				tfOutputs.Status.Message = fmt.Sprintf("Failed to get S3 object ETag: %v", err)
+				tfOutputs.Status.Message = fmt.Sprintf("Failed to check backend changes: %v", err)
 			})
 			return ctrl.Result{RequeueAfter: syncInterval}, err
 		}
 
-		// Get stored ETag from annotation
-		var storedETag string
-		if terraformOutputs.Annotations != nil {
-			storedETag = terraformOutputs.Annotations[ETagAnnotation]
-		}
-
-		// Skip processing if ETag hasn't changed
-		if storedETag != "" && storedETag == currentETag {
-			logger.Info("S3 object ETag unchanged, skipping sync", "etag", currentETag)
+		// Skip processing if no ETags have changed
+		if !hasChanges {
+			logger.Info("No backend changes detected, skipping sync")
 			return ctrl.Result{RequeueAfter: syncInterval}, nil
 		}
 
-		logger.Info("S3 object changed, processing updates", "oldETag", storedETag, "newETag", currentETag)
+		logger.Info("Backend changes detected, processing updates")
 	} else {
 		logger.Info("Force sync triggered due to missing ConfigMap/Secret resources")
 	}
@@ -131,8 +125,8 @@ func (r *TerraformOutputsReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	// Fetch outputs from S3
-	outputs, sensitiveFlags, err := r.fetchTerraformOutputs(ctx, &terraformOutputs)
+	// Fetch outputs from all backends
+	outputs, sensitiveFlags, err := r.fetchAllTerraformOutputs(ctx, &terraformOutputs)
 	if err != nil {
 		logger.Error(err, "Failed to fetch Terraform outputs")
 		// Update status to Failed with retry
@@ -167,14 +161,14 @@ func (r *TerraformOutputsReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			tfOutputs.Status.Message = fmt.Sprintf("Successfully synced %d outputs", len(outputs))
 		}
 
-		// Update ETag annotation only if this wasn't a force sync
+		// Update ETag annotations only if this wasn't a force sync
 		if !shouldForceSync {
-			// Get current ETag again (might have changed during processing)
-			if currentETag, err := r.getS3ObjectETag(ctx, tfOutputs); err == nil {
+			// Get current ETags again (might have changed during processing)
+			if _, currentETags, err := r.checkBackendChanges(ctx, tfOutputs); err == nil {
 				if tfOutputs.Annotations == nil {
 					tfOutputs.Annotations = make(map[string]string)
 				}
-				tfOutputs.Annotations[ETagAnnotation] = currentETag
+				r.updateETagAnnotations(tfOutputs, currentETags)
 			}
 		}
 	}); err != nil {
@@ -255,19 +249,54 @@ func (r *TerraformOutputsReconciler) hasOwnerReference(ownerRefs []metav1.OwnerR
 	return false
 }
 
-// getS3ObjectETag gets the ETag of the S3 object without downloading it
-func (r *TerraformOutputsReconciler) getS3ObjectETag(ctx context.Context, tfOutputs *outputsv1alpha1.TerraformOutputs) (string, error) {
+// checkBackendChanges checks if any backend has changed by comparing ETags
+func (r *TerraformOutputsReconciler) checkBackendChanges(ctx context.Context, tfOutputs *outputsv1alpha1.TerraformOutputs) (bool, map[int]string, error) {
+	if len(tfOutputs.Spec.Backends) == 0 {
+		return false, nil, fmt.Errorf("no backends configured")
+	}
+
+	currentETags := make(map[int]string)
+	hasChanges := false
+
+	for i, backend := range tfOutputs.Spec.Backends {
+		if backend.Type != "s3" {
+			return false, nil, fmt.Errorf("unsupported backend type: %s", backend.Type)
+		}
+
+		etag, err := r.getS3ObjectETag(ctx, backend.Source)
+		if err != nil {
+			return false, nil, fmt.Errorf("failed to get ETag for backend %d: %w", i, err)
+		}
+
+		currentETags[i] = etag
+
+		// Compare with stored ETag
+		storedETag := ""
+		if tfOutputs.Annotations != nil {
+			storedETag = tfOutputs.Annotations[fmt.Sprintf("%s%d", ETagAnnotationPrefix, i)]
+		}
+
+		if storedETag == "" || storedETag != etag {
+			hasChanges = true
+		}
+	}
+
+	return hasChanges, currentETags, nil
+}
+
+// getS3ObjectETag gets the ETag of an S3 object without downloading it
+func (r *TerraformOutputsReconciler) getS3ObjectETag(ctx context.Context, s3Spec outputsv1alpha1.S3Spec) (string, error) {
 	// Load AWS configuration
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(tfOutputs.Spec.S3Backend.Region))
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(s3Spec.Region))
 	if err != nil {
 		return "", fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	// Create S3 client with optional custom endpoint
 	var s3Client *s3.Client
-	if tfOutputs.Spec.S3Backend.Endpoint != "" {
+	if s3Spec.Endpoint != "" {
 		s3Client = s3.NewFromConfig(cfg, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(tfOutputs.Spec.S3Backend.Endpoint)
+			o.BaseEndpoint = aws.String(s3Spec.Endpoint)
 			o.UsePathStyle = true // Often needed for S3-compatible services
 		})
 	} else {
@@ -276,8 +305,8 @@ func (r *TerraformOutputsReconciler) getS3ObjectETag(ctx context.Context, tfOutp
 
 	// Use HeadObject to get metadata without downloading the file
 	result, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(tfOutputs.Spec.S3Backend.Bucket),
-		Key:    aws.String(tfOutputs.Spec.S3Backend.Key),
+		Bucket: aws.String(s3Spec.Bucket),
+		Key:    aws.String(s3Spec.Key),
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to get S3 object metadata: %w", err)
@@ -288,6 +317,13 @@ func (r *TerraformOutputsReconciler) getS3ObjectETag(ctx context.Context, tfOutp
 	etag = strings.Trim(etag, "\"")
 
 	return etag, nil
+}
+
+// updateETagAnnotations updates the ETag annotations for all backends
+func (r *TerraformOutputsReconciler) updateETagAnnotations(tfOutputs *outputsv1alpha1.TerraformOutputs, etags map[int]string) {
+	for i, etag := range etags {
+		tfOutputs.Annotations[fmt.Sprintf("%s%d", ETagAnnotationPrefix, i)] = etag
+	}
 }
 
 // updateResourceWithRetry updates both spec/status and annotations with retry logic
@@ -327,21 +363,63 @@ func (r *TerraformOutputsReconciler) updateStatusWithRetry(ctx context.Context, 
 	})
 }
 
-// fetchTerraformOutputs fetches outputs from S3 Terraform state using AWS SDK v2
-func (r *TerraformOutputsReconciler) fetchTerraformOutputs(ctx context.Context, tfOutputs *outputsv1alpha1.TerraformOutputs) (map[string]interface{}, map[string]bool, error) {
+// fetchAllTerraformOutputs fetches outputs from all backends and merges them
+func (r *TerraformOutputsReconciler) fetchAllTerraformOutputs(ctx context.Context, tfOutputs *outputsv1alpha1.TerraformOutputs) (map[string]interface{}, map[string]bool, error) {
+	logger := log.FromContext(ctx)
+
+	if len(tfOutputs.Spec.Backends) == 0 {
+		return nil, nil, fmt.Errorf("no backends configured")
+	}
+
+	// Merged outputs from all backends
+	mergedOutputs := make(map[string]interface{})
+	mergedSensitiveFlags := make(map[string]bool)
+
+	for i, backend := range tfOutputs.Spec.Backends {
+		if backend.Type != "s3" {
+			return nil, nil, fmt.Errorf("unsupported backend type: %s for backend %d", backend.Type, i)
+		}
+
+		logger.Info("Processing backend", "index", i, "bucket", backend.Source.Bucket, "key", backend.Source.Key)
+
+		outputs, sensitiveFlags, err := r.fetchTerraformOutputsFromS3(ctx, backend.Source, i)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to fetch outputs from backend %d: %w", i, err)
+		}
+
+		// Merge outputs, checking for conflicts
+		for key, value := range outputs {
+			if existingValue, exists := mergedOutputs[key]; exists {
+				logger.Info("Output key conflict detected, using latest value", "key", key, "backend", i)
+				// Log the conflict but use the latest value (last backend wins)
+				_ = existingValue
+			}
+			mergedOutputs[key] = value
+			mergedSensitiveFlags[key] = sensitiveFlags[key]
+		}
+
+		logger.Info("Successfully processed backend", "index", i, "outputs", len(outputs))
+	}
+
+	logger.Info("Successfully fetched and merged Terraform outputs from all backends", "totalOutputs", len(mergedOutputs), "backends", len(tfOutputs.Spec.Backends))
+	return mergedOutputs, mergedSensitiveFlags, nil
+}
+
+// fetchTerraformOutputsFromS3 fetches outputs from a single S3 backend
+func (r *TerraformOutputsReconciler) fetchTerraformOutputsFromS3(ctx context.Context, s3Spec outputsv1alpha1.S3Spec, backendIndex int) (map[string]interface{}, map[string]bool, error) {
 	logger := log.FromContext(ctx)
 
 	// Load AWS configuration
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(tfOutputs.Spec.S3Backend.Region))
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(s3Spec.Region))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	// Create S3 client with optional custom endpoint
 	var s3Client *s3.Client
-	if tfOutputs.Spec.S3Backend.Endpoint != "" {
+	if s3Spec.Endpoint != "" {
 		s3Client = s3.NewFromConfig(cfg, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(tfOutputs.Spec.S3Backend.Endpoint)
+			o.BaseEndpoint = aws.String(s3Spec.Endpoint)
 			o.UsePathStyle = true // Often needed for S3-compatible services
 		})
 	} else {
@@ -349,11 +427,11 @@ func (r *TerraformOutputsReconciler) fetchTerraformOutputs(ctx context.Context, 
 	}
 
 	// Download state file
-	logger.Info("Downloading Terraform state", "bucket", tfOutputs.Spec.S3Backend.Bucket, "key", tfOutputs.Spec.S3Backend.Key)
+	logger.Info("Downloading Terraform state", "backend", backendIndex, "bucket", s3Spec.Bucket, "key", s3Spec.Key)
 
 	result, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(tfOutputs.Spec.S3Backend.Bucket),
-		Key:    aws.String(tfOutputs.Spec.S3Backend.Key),
+		Bucket: aws.String(s3Spec.Bucket),
+		Key:    aws.String(s3Spec.Key),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to download state file: %w", err)
@@ -381,7 +459,6 @@ func (r *TerraformOutputsReconciler) fetchTerraformOutputs(ctx context.Context, 
 		sensitiveFlags[key] = output.Sensitive
 	}
 
-	logger.Info("Successfully fetched Terraform outputs", "count", len(outputs))
 	return outputs, sensitiveFlags, nil
 }
 

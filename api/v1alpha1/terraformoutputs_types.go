@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,8 +25,9 @@ import (
 
 // TerraformOutputsSpec defines the desired state of TerraformOutputs
 type TerraformOutputsSpec struct {
-	// S3Backend defines the S3 backend configuration
-	S3Backend S3BackendSpec `json:"s3Backend"`
+	// Backends defines the list of backend configurations
+	// +kubebuilder:validation:MinItems=1
+	Backends []BackendSpec `json:"backends"`
 
 	// SyncInterval defines how often to sync outputs (default: 5m)
 	// +kubebuilder:default="5m"
@@ -36,8 +37,18 @@ type TerraformOutputsSpec struct {
 	Target TargetSpec `json:"target"`
 }
 
-// S3BackendSpec defines S3 backend configuration
-type S3BackendSpec struct {
+// BackendSpec defines a backend configuration
+type BackendSpec struct {
+	// Type defines the backend type
+	// +kubebuilder:validation:Enum=s3
+	Type string `json:"type"`
+
+	// Source defines the backend-specific configuration
+	Source S3Spec `json:"source"`
+}
+
+// S3Spec defines S3 backend configuration
+type S3Spec struct {
 	// Bucket is the S3 bucket name
 	Bucket string `json:"bucket"`
 
@@ -50,6 +61,10 @@ type S3BackendSpec struct {
 	// Endpoint is optional S3-compatible endpoint
 	// +optional
 	Endpoint string `json:"endpoint,omitempty"`
+
+	// Role is the IAM role to assume for accessing the S3 bucket
+	// +optional
+	Role string `json:"role,omitempty"`
 }
 
 // TargetSpec defines where outputs should be stored
@@ -92,7 +107,7 @@ type TerraformOutputsStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:printcolumn:name="Bucket",type=string,JSONPath=`.spec.s3Backend.bucket`
+//+kubebuilder:printcolumn:name="Bucket",type=string,JSONPath=`.spec.backends[0].source.bucket`
 //+kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.syncStatus`
 //+kubebuilder:printcolumn:name="Outputs",type=integer,JSONPath=`.status.outputCount`
 //+kubebuilder:printcolumn:name="Last Sync",type=date,JSONPath=`.status.lastSyncTime`
