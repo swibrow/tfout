@@ -3,18 +3,17 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-    app.kubernetes.io/name: tf-outputs-operator
+    app.kubernetes.io/name: tfout
     app.kubernetes.io/managed-by: kustomize
-  name: system
+  name: tfout
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: system
   labels:
     control-plane: controller-manager
-    app.kubernetes.io/name: tf-outputs-operator
+    app.kubernetes.io/name: tfout
     app.kubernetes.io/managed-by: kustomize
 spec:
   selector:
@@ -42,8 +41,6 @@ spec:
       #             values:
       #               - amd64
       #               - arm64
-      #               - ppc64le
-      #               - s390x
       #           - key: kubernetes.io/os
       #             operator: In
       #             values:
@@ -58,38 +55,39 @@ spec:
         # seccompProfile:
         #   type: RuntimeDefault
       containers:
-      - command:
-        - /manager
-        args:
-          - --leader-elect
-          - --health-probe-bind-address=:8081
-        image: controller:latest
-        name: manager
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - "ALL"
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8081
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: 8081
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        # TODO(user): Configure the resources accordingly based on the project requirements.
-        # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-        resources:
-          limits:
-            cpu: 500m
-            memory: 128Mi
-          requests:
-            cpu: 10m
-            memory: 64Mi
+        - command:
+            - /manager
+          args:
+            - --leader-elect
+            - --health-probe-bind-address=:8081
+          image: controller:latest
+          imagePullPolicy: IfNotPresent
+          name: manager
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # TODO(user): Configure the resources accordingly based on the project requirements.
+          # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

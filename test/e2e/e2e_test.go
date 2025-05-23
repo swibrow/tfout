@@ -24,10 +24,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"tfoutputs.io/terraformoutputs/test/utils"
+	"github.com/swibrow/tfout/test/utils"
 )
 
-const namespace = "tf-outputs-operator-system"
+const namespace = "tfout"
 
 var _ = Describe("controller", Ordered, func() {
 	BeforeAll(func() {
@@ -60,7 +60,7 @@ var _ = Describe("controller", Ordered, func() {
 			var err error
 
 			// projectimage stores the name of the image used in the example
-			var projectimage = "example.com/tf-outputs-operator:v0.0.1"
+			var projectimage = "example.com/tfout:v0.0.1"
 
 			By("building the manager(Operator) image")
 			cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectimage))
@@ -101,7 +101,10 @@ var _ = Describe("controller", Ordered, func() {
 					return fmt.Errorf("expect 1 controller pods running, but got %d", len(podNames))
 				}
 				controllerPodName = podNames[0]
-				ExpectWithOffset(2, controllerPodName).Should(ContainSubstring("controller-manager"))
+				ExpectWithOffset(
+					2,
+					controllerPodName,
+				).Should(ContainSubstring("controller-manager"))
 
 				// Validate pod status
 				cmd = exec.Command("kubectl", "get",

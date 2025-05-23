@@ -1,4 +1,4 @@
 ## Append samples of your project ##
 resources:
-- outputs_v1alpha1_terraformoutputs.yaml
+  - tfout_v1alpha1_terraformoutputs.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

@@ -1,0 +1,20 @@
+apiVersion: v2
+name: tfout
+description: A Kubernetes operator that syncs Terraform outputs from various backends into ConfigMaps and Secrets
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/swibrow/tfout
+sources:
+  - https://github.com/swibrow/tfout
+maintainers:
+  - name: TFOut Team
+keywords:
+  - terraform
+  - kubernetes
+  - operator
+  - configmap
+  - secret
+  - s3
+annotations:
+  category: DevOps

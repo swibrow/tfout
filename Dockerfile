@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.22 AS builder
+FROM golang:1.24 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -26,6 +26,10 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
+
+LABEL org.opencontainers.image.source=https://github.com/swibrow/tfout
+LABEL org.opencontainers.image.description="tfout is a kubernetes operator to import terraform outputs to Kubernetes secrets and configmaps."
+
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532

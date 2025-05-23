@@ -1,0 +1,50 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "matchCategories": [
+        "docker"
+      ],
+      "enabled": true
+    },
+    {
+      "matchManagers": [
+        "gomod"
+      ],
+      "semanticCommitType": "deps",
+      "semanticCommitScope": "deps"
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "actions"
+    },
+    {
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "semanticCommitType": "docker",
+      "semanticCommitScope": "docker"
+    }
+  ],
+  "prConcurrentLimit": 5,
+  "schedule": [
+    "before 3am on Monday"
+  ],
+  "timezone": "UTC",
+  "postUpdateOptions": [
+    "gomodTidy",
+    "gomodUpdateImportPaths"
+  ],
+  "gomod": {
+    "enabled": true
+  },
+  "github-actions": {
+    "enabled": true
+  }
+}

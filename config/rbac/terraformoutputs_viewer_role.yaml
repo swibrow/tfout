@@ -3,21 +3,21 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    app.kubernetes.io/name: tf-outputs-operator
+    app.kubernetes.io/name: tfout
     app.kubernetes.io/managed-by: kustomize
   name: terraformoutputs-viewer-role
 rules:
-- apiGroups:
-  - outputs.tfoutputs.io
-  resources:
-  - terraformoutputs
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - outputs.tfoutputs.io
-  resources:
-  - terraformoutputs/status
-  verbs:
-  - get
+  - apiGroups:
+      - tfout.wibrow.net
+    resources:
+      - terraformoutputs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - tfout.wibrow.net
+    resources:
+      - terraformoutputs/status
+    verbs:
+      - get

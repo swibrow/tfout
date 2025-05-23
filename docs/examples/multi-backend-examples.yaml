@@ -1,0 +1,56 @@
+# Multi-Backend TerraformOutputs Examples
+# This file demonstrates how to configure different backend types
+# Currently only S3 is implemented, others are planned for future releases
+
+---
+# Example 1: Current S3 Backend (Fully Implemented)
+apiVersion: tfout.wibrow.net/v1alpha1
+kind: TerraformOutputs
+metadata:
+  name: s3-terraform-outputs
+  namespace: default
+spec:
+  backends:
+    - s3:
+        bucket: "my-terraform-state-bucket"
+        key: "production/terraform.tfstate"
+        region: "us-east-1"
+        # Optional: Custom S3-compatible endpoint (e.g., MinIO)
+        endpoint: "https://s3.example.com"
+        # Optional: IAM role to assume
+        role: "arn:aws:iam::123456789012:role/terraform-reader"
+  syncInterval: "5m"
+  target:
+    namespace: "production"
+    configMapName: "terraform-config"
+    secretName: "terraform-secrets"
+---
+# Example 2: Mixed Backends (Multiple S3 backends)
+apiVersion: tfout.wibrow.net/v1alpha1
+kind: TerraformOutputs
+metadata:
+  name: multi-s3-terraform-outputs
+  namespace: default
+spec:
+  backends:
+    # Primary infrastructure state
+    - s3:
+        bucket: "infra-terraform-state"
+        key: "vpc/terraform.tfstate"
+        region: "us-east-1"
+    # Application infrastructure state
+    - s3:
+        bucket: "app-terraform-state"
+        key: "app/terraform.tfstate"
+        region: "us-east-1"
+    # Database infrastructure state
+    - s3:
+        bucket: "db-terraform-state"
+        key: "database/terraform.tfstate"
+        region: "us-west-2"
+        role: "arn:aws:iam::123456789012:role/cross-region-reader"
+  syncInterval: "3m"
+  target:
+    namespace: "production"
+    configMapName: "merged-terraform-config"
+    secretName: "merged-terraform-secrets"

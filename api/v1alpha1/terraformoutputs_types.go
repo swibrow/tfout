@@ -1,32 +1,18 @@
-/*
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package v1alpha1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // TerraformOutputsSpec defines the desired state of TerraformOutputs
 type TerraformOutputsSpec struct {
-	// S3Backend defines the S3 backend configuration
-	S3Backend S3BackendSpec `json:"s3Backend"`
+	// Backends defines the list of backend configurations
+	// +kubebuilder:validation:MinItems=1
+	Backends []BackendSpec `json:"backends"`
 
 	// SyncInterval defines how often to sync outputs (default: 5m)
 	// +kubebuilder:default="5m"
@@ -36,8 +22,16 @@ type TerraformOutputsSpec struct {
 	Target TargetSpec `json:"target"`
 }
 
-// S3BackendSpec defines S3 backend configuration
-type S3BackendSpec struct {
+// BackendSpec defines a backend configuration
+// Exactly one backend configuration must be specified.
+type BackendSpec struct {
+	// S3 defines the S3 backend configuration
+	// +optional
+	S3 *S3Spec `json:"s3,omitempty"`
+}
+
+// S3Spec defines S3 backend configuration
+type S3Spec struct {
 	// Bucket is the S3 bucket name
 	Bucket string `json:"bucket"`
 
@@ -50,6 +44,10 @@ type S3BackendSpec struct {
 	// Endpoint is optional S3-compatible endpoint
 	// +optional
 	Endpoint string `json:"endpoint,omitempty"`
+
+	// Role is the IAM role to assume for accessing the S3 bucket
+	// +optional
+	Role string `json:"role,omitempty"`
 }
 
 // TargetSpec defines where outputs should be stored
@@ -90,12 +88,12 @@ type TerraformOutputsStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:printcolumn:name="Bucket",type=string,JSONPath=`.spec.s3Backend.bucket`
-//+kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.syncStatus`
-//+kubebuilder:printcolumn:name="Outputs",type=integer,JSONPath=`.status.outputCount`
-//+kubebuilder:printcolumn:name="Last Sync",type=date,JSONPath=`.status.lastSyncTime`
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Bucket",type=string,JSONPath=`.spec.backends[0].source.bucket`
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.syncStatus`
+// +kubebuilder:printcolumn:name="Outputs",type=integer,JSONPath=`.status.outputCount`
+// +kubebuilder:printcolumn:name="Last Sync",type=date,JSONPath=`.status.lastSyncTime`
 
 // TerraformOutputs is the Schema for the terraformoutputs API
 type TerraformOutputs struct {
@@ -106,15 +104,40 @@ type TerraformOutputs struct {
 	Status TerraformOutputsStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // TerraformOutputsList contains a list of TerraformOutputs
 type TerraformOutputsList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta `                   json:",inline"`
+	metav1.ListMeta `                   json:"metadata,omitempty"`
 	Items           []TerraformOutputs `json:"items"`
 }
 
 func init() {
 	SchemeBuilder.Register(&TerraformOutputs{}, &TerraformOutputsList{})
+}
+
+// ValidateBackend validates that exactly one backend configuration is specified
+func (bs *BackendSpec) ValidateBackend() error {
+	configCount := 0
+
+	if bs.S3 != nil {
+		configCount++
+	}
+
+	if configCount == 0 {
+		return fmt.Errorf(
+			"exactly one backend configuration must be specified (s3)",
+		)
+	}
+
+	return nil
+}
+
+// GetBackendType returns the type of backend configured
+func (bs *BackendSpec) GetBackendType() string {
+	if bs.S3 != nil {
+		return "s3"
+	}
+	return ""
 }

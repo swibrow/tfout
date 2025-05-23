@@ -1,18 +1,18 @@
-# config/samples/outputs_v1alpha1_terraformoutputs.yaml
-apiVersion: outputs.tfoutputs.io/v1alpha1
+apiVersion: tfout.wibrow.net/v1alpha1
 kind: TerraformOutputs
 metadata:
   name: test-terraform-outputs
   namespace: default
 spec:
   backends:
-    - type: "s3" # Specify the backend type
-      source:
+    - s3:
         bucket: "test-tf-operator"
         key: "test/terraform.tfstate"
-        region: "eu-central-1" # Optional
-        role: "arn:aws:iam::123456789012:role/terraform-role" # Optional
-
+        region: "eu-central-1"
+    - s3:
+        bucket: "test-tf-operator"
+        key: "test/terraform-one.tfstate"
+        region: "eu-central-1"
   syncInterval: "30s" # Fast sync for testing
   target:
     namespace: "default"

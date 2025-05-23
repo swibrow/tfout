@@ -84,7 +84,11 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go
+	go run ./cmd/main.go --metrics-bind-address=:8080
+
+.PHONY: run-dev
+run-dev: manifests generate fmt vet ## Run a controller from your host with development settings.
+	go run ./cmd/main.go --metrics-bind-address=:8080 --health-probe-bind-address=:8081 --zap-devel=true
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -103,15 +107,15 @@ docker-push: ## Push docker image with the manager.
 # - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 # - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
 # To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
+PLATFORMS ?= linux/arm64,linux/amd64
 .PHONY: docker-buildx
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name tf-outputs-operator-builder
-	$(CONTAINER_TOOL) buildx use tf-outputs-operator-builder
+	- $(CONTAINER_TOOL) buildx create --name tfout-builder
+	$(CONTAINER_TOOL) buildx use tfout-builder
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm tf-outputs-operator-builder
+	- $(CONTAINER_TOOL) buildx rm tfout-builder
 	rm Dockerfile.cross
 
 .PHONY: build-installer
@@ -158,10 +162,10 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.4.3
-CONTROLLER_TOOLS_VERSION ?= v0.16.1
-ENVTEST_VERSION ?= release-0.19
-GOLANGCI_LINT_VERSION ?= v1.59.1
+KUSTOMIZE_VERSION ?= v5.6.0
+CONTROLLER_TOOLS_VERSION ?= v0.18.0
+ENVTEST_VERSION ?= release-0.21
+GOLANGCI_LINT_VERSION ?= v2.1.6
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -181,7 +185,7 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
