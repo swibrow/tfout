@@ -1,0 +1,60 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Set up Kind
+      uses: helm/kind-action@v1
+      with:
+        cluster_name: kind
+        kubectl_version: v1.29.0
+
+    - name: Wait for cluster to be ready
+      run: |
+        kubectl cluster-info
+        kubectl wait --for=condition=Ready nodes --all --timeout=60s
+
+    - name: Load Docker image
+      run: |
+        make docker-build
+        kind load docker-image controller:latest
+
+    - name: Deploy CRDs
+      run: make install
+
+    - name: Deploy controller
+      run: |
+        cd config/manager && $(MAKE) -C ../.. kustomize edit set image controller=controller:latest
+        $(MAKE) -C ../.. kustomize build config/default | kubectl apply -f -
+
+    - name: Wait for controller to be ready
+      run: |
+        kubectl wait --for=condition=Available deployment/tf-outputs-operator-controller-manager \
+          -n tf-outputs-operator-system --timeout=60s
+
+    - name: Run E2E tests
+      run: make test-e2e
