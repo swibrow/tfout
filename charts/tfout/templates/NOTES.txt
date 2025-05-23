@@ -1,0 +1,43 @@
+1. Get the application URL by running these commands:
+{{- if and .Values.metrics.enabled (ne .Values.controller.metricsBindAddress "0") }}
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "tfout.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:8080/metrics to access the metrics endpoint"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:$CONTAINER_PORT
+{{- end }}
+
+2. TFOut has been installed successfully!
+
+3. To create a TerraformOutputs resource, create a YAML file like this:
+
+   apiVersion: tfout.wibrow.net/v1alpha1
+   kind: TerraformOutputs
+   metadata:
+     name: my-terraform-outputs
+     namespace: {{ .Release.Namespace }}
+   spec:
+     syncInterval: 5m
+     backends:
+     - s3:
+         bucket: my-terraform-state-bucket
+         key: path/to/terraform.tfstate
+         region: us-west-2
+         # Optional: role: arn:aws:iam::123456789012:role/terraform-reader
+         # Optional: endpoint: https://s3.amazonaws.com
+     target:
+       namespace: {{ .Release.Namespace }}
+       configMapName: terraform-outputs
+       secretName: terraform-secrets
+
+4. Apply the resource:
+   kubectl apply -f your-terraform-outputs.yaml
+
+5. Check the status:
+   kubectl get terraformoutputs -n {{ .Release.Namespace }}
+   kubectl describe terraformoutputs my-terraform-outputs -n {{ .Release.Namespace }}
+
+6. View the created ConfigMap and Secret:
+   kubectl get configmap terraform-outputs -n {{ .Release.Namespace }} -o yaml
+   kubectl get secret terraform-secrets -n {{ .Release.Namespace }} -o yaml
+
+For more information, visit: https://github.com/swibrow/tfout

@@ -1,0 +1,57 @@
+name: Update Installer
+
+on:
+  release:
+    types: [published]
+
+env:
+  GO_VERSION: '1.24'
+
+jobs:
+  update-installer:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Extract version from tag
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+
+    - name: Update installer with release image
+      env:
+        IMG: ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        make build-installer
+
+        # Create a branch for the installer update
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git checkout -b update-installer-${{ steps.version.outputs.VERSION }}
+
+        # Commit the updated installer
+        git add dist/install.yaml
+        git commit -m "Update installer for release ${{ steps.version.outputs.VERSION }}" || exit 0
+
+        # Push the changes
+        git push origin update-installer-${{ steps.version.outputs.VERSION }}
+
+        # Create a pull request
+        gh pr create \
+          --title "Update installer for release ${{ steps.version.outputs.VERSION }}" \
+          --body "Automatically generated PR to update the installer manifest with the release image tag." \
+          --head update-installer-${{ steps.version.outputs.VERSION }} \
+          --base main
+

@@ -25,3 +25,15 @@ go.work
 *.swp
 *.swo
 *~
+
+# MkDocs build output
+site/
+
+# Test chart inputs
+charts/tfout/values-test.yaml
+
+# Claude
+CLAUDE.md
+
+# Python virtual environments
+.venv/

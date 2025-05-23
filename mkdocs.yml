@@ -1,0 +1,75 @@
+site_name: TFOut Documentation
+site_description: Kubernetes operator that syncs Terraform outputs from various backends into ConfigMaps and Secrets
+site_url: https://swibrow.github.io/tfout/
+repo_url: https://github.com/swibrow/tfout
+repo_name: swibrow/tfout
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+      primary: blue
+      accent: blue
+    # Palette toggle for dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+      primary: blue
+      accent: blue
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mermaid2
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: installation.md
+      - Quick Start: quick-start.md
+  - Configuration:
+      - TerraformOutputs CRD: configuration/terraformoutputs.md
+      - Backends: configuration/backends.md
+  - Deployment:
+      - Helm Chart: deployment/helm.md
+  - Monitoring:
+      - Prometheus Metrics: monitoring/metrics.md
+  - Examples:
+      - Basic Usage: examples/basic.md
+  - Reference:
+      - Troubleshooting: reference/troubleshooting.md

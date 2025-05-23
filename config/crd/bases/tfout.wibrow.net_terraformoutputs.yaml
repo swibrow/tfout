@@ -3,10 +3,10 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.1
-  name: terraformoutputs.outputs.tfoutputs.io
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: terraformoutputs.tfout.wibrow.net
 spec:
-  group: outputs.tfoutputs.io
+  group: tfout.wibrow.net
   names:
     kind: TerraformOutputs
     listKind: TerraformOutputsList
@@ -15,7 +15,7 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.s3Backend.bucket
+    - jsonPath: .spec.backends[0].source.bucket
       name: Bucket
       type: string
     - jsonPath: .status.syncStatus
@@ -52,26 +52,40 @@ spec:
           spec:
             description: TerraformOutputsSpec defines the desired state of TerraformOutputs
             properties:
-              s3Backend:
-                description: S3Backend defines the S3 backend configuration
-                properties:
-                  bucket:
-                    description: Bucket is the S3 bucket name
-                    type: string
-                  endpoint:
-                    description: Endpoint is optional S3-compatible endpoint
-                    type: string
-                  key:
-                    description: Key is the path to the terraform state file
-                    type: string
-                  region:
-                    description: Region is the AWS region
-                    type: string
-                required:
-                - bucket
-                - key
-                - region
-                type: object
+              backends:
+                description: Backends defines the list of backend configurations
+                items:
+                  description: |-
+                    BackendSpec defines a backend configuration
+                    Exactly one backend configuration must be specified.
+                  properties:
+                    s3:
+                      description: S3 defines the S3 backend configuration
+                      properties:
+                        bucket:
+                          description: Bucket is the S3 bucket name
+                          type: string
+                        endpoint:
+                          description: Endpoint is optional S3-compatible endpoint
+                          type: string
+                        key:
+                          description: Key is the path to the terraform state file
+                          type: string
+                        region:
+                          description: Region is the AWS region
+                          type: string
+                        role:
+                          description: Role is the IAM role to assume for accessing
+                            the S3 bucket
+                          type: string
+                      required:
+                      - bucket
+                      - key
+                      - region
+                      type: object
+                  type: object
+                minItems: 1
+                type: array
               syncInterval:
                 default: 5m
                 description: 'SyncInterval defines how often to sync outputs (default:
@@ -93,7 +107,7 @@ spec:
                     type: string
                 type: object
             required:
-            - s3Backend
+            - backends
             - target
             type: object
           status:

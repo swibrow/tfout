@@ -15,12 +15,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	outputsv1alpha1 "tfoutputs.io/terraformoutputs/api/v1alpha1"
-	"tfoutputs.io/terraformoutputs/internal/controller"
+	tfoutv1alpha1 "github.com/swibrow/tfout/api/v1alpha1"
+	"github.com/swibrow/tfout/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -32,7 +31,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(outputsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(tfoutv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -42,10 +41,20 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
-	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metric endpoint binds to. "+
-		"Use the port :8080 to bind to all interfaces. "+
-		"Set to \"0\" to disable the metrics server.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(
+		&metricsAddr,
+		"metrics-bind-address",
+		":8080",
+		"The address the metric endpoint binds to. "+
+			"Use the port :8080 to bind to all interfaces. "+
+			"Set to \"0\" to disable the metrics server.",
+	)
+	flag.StringVar(
+		&probeAddr,
+		"health-probe-bind-address",
+		":8081",
+		"The address the probe endpoint binds to.",
+	)
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -84,15 +93,15 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
-			BindAddress:    metricsAddr,
-			SecureServing:  secureMetrics,
-			TLSOpts:        tlsOpts,
-			FilterProvider: filters.WithAuthenticationAndAuthorization,
+			BindAddress:   metricsAddr,
+			SecureServing: secureMetrics,
+			TLSOpts:       tlsOpts,
+			// No authentication filters - open access to metrics
 		},
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "a33bd623.tfoutputs.io",
+		LeaderElectionID:       "a33bd623.tfout.wibrow.net",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly

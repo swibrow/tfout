@@ -2,19 +2,19 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: tfoutputs.io
+domain: tfout.wibrow.net
 layout:
-- go.kubebuilder.io/v4
-projectName: tf-outputs-operator
-repo: tfoutputs.io/terraformoutputs
+  - go.kubebuilder.io/v4
+projectName: tfout
+repo: swibrow/tfout
 resources:
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: tfoutputs.io
-  group: outputs
-  kind: TerraformOutputs
-  path: tfoutputs.io/terraformoutputs/api/v1alpha1
-  version: v1alpha1
+  - api:
+      crdVersion: v1
+      namespaced: true
+    controller: true
+    domain: tfout.wibrow.net
+    group: outputs
+    kind: TerraformOutputs
+    path: tfout.wibrow.net/terraformoutputs/api/v1alpha1
+    version: v1alpha1
 version: "3"

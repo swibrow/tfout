@@ -1,0 +1,183 @@
+# Example: How to monitor tfout metrics
+# This example shows how to set up basic monitoring for the operator
+
+---
+# ServiceMonitor for Prometheus to scrape metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tfout-metrics
+  namespace: tfout-system
+  labels:
+    app.kubernetes.io/name: tfout
+spec:
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  endpoints:
+    - port: https
+      scheme: https
+      tlsConfig:
+        insecureSkipVerify: true
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      path: /metrics
+
+---
+# Example PrometheusRule with basic alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tfout-alerts
+  namespace: tfout-system
+  labels:
+    app.kubernetes.io/name: tfout
+spec:
+  groups:
+    - name: tfout.rules
+      rules:
+        - alert: TerraformOutputsReconcileFailure
+          expr: rate(terraform_outputs_reconcile_total{result="error"}[5m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            component: tfout
+          annotations:
+            summary: "TerraformOutputs reconciliation failures"
+            description: |
+              TerraformOutputs {{ $labels.namespace }}/{{ $labels.name }} has reconciliation failures.
+              Current error rate: {{ $value }} errors/sec
+
+        - alert: TerraformOutputsS3RequestFailure
+          expr: rate(terraform_outputs_s3_requests_total{result="error"}[5m]) > 0
+          for: 2m
+          labels:
+            severity: warning
+            component: tfout
+          annotations:
+            summary: "S3 request failures for TerraformOutputs"
+            description: |
+              S3 requests are failing for TerraformOutputs {{ $labels.namespace }}/{{ $labels.name }}.
+              Operation: {{ $labels.operation }}
+              Error rate: {{ $value }} errors/sec
+
+        - alert: TerraformOutputsSyncStale
+          expr: time() - terraform_outputs_last_sync_timestamp > 3600
+          for: 0m
+          labels:
+            severity: warning
+            component: tfout
+          annotations:
+            summary: "TerraformOutputs sync is stale"
+            description: |
+              TerraformOutputs {{ $labels.namespace }}/{{ $labels.name }} hasn't synced successfully for over 1 hour.
+              Last sync: {{ $value | humanizeTimestamp }}
+
+        - alert: TerraformOutputsSlowReconciliation
+          expr: histogram_quantile(0.95, rate(terraform_outputs_reconcile_duration_seconds_bucket[5m])) > 30
+          for: 5m
+          labels:
+            severity: warning
+            component: tfout
+          annotations:
+            summary: "TerraformOutputs reconciliation is slow"
+            description: |
+              TerraformOutputs reconciliation 95th percentile duration is {{ $value }}s, which is over the 30s threshold.
+
+---
+# Example Grafana Dashboard ConfigMap (JSON format)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tfout-dashboard
+  namespace: tfout-system
+  labels:
+    grafana_dashboard: "1"
+data:
+  tfout.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "TF Outputs Operator",
+        "tags": ["kubernetes", "terraform", "operator"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Reconciliation Success Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "rate(terraform_outputs_reconcile_total{result=\"success\"}[5m]) / rate(terraform_outputs_reconcile_total[5m])",
+                "format": "time_series",
+                "legendFormat": "Success Rate"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "min": 0,
+                "max": 1
+              }
+            }
+          },
+          {
+            "title": "Reconciliation Duration",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.50, rate(terraform_outputs_reconcile_duration_seconds_bucket[5m]))",
+                "legendFormat": "50th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.95, rate(terraform_outputs_reconcile_duration_seconds_bucket[5m]))",
+                "legendFormat": "95th percentile"
+              }
+            ]
+          },
+          {
+            "title": "Active TerraformOutputs Resources",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "count(terraform_outputs_found_total)",
+                "legendFormat": "Resources"
+              }
+            ]
+          },
+          {
+            "title": "Total Outputs Managed",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(terraform_outputs_found_total)",
+                "legendFormat": "Outputs"
+              }
+            ]
+          },
+          {
+            "title": "S3 Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(terraform_outputs_s3_requests_total{result=\"success\"}[5m])",
+                "legendFormat": "Success - {{ $labels.operation }}"
+              },
+              {
+                "expr": "rate(terraform_outputs_s3_requests_total{result=\"error\"}[5m])",
+                "legendFormat": "Error - {{ $labels.operation }}"
+              }
+            ]
+          },
+          {
+            "title": "Backend Fetch Errors",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(terraform_outputs_backend_fetch_total{result=\"error\"}[5m])",
+                "legendFormat": "{{ $labels.namespace }}/{{ $labels.name }} - Backend {{ $labels.backend_index }}"
+              }
+            ]
+          }
+        ]
+      }
+    }

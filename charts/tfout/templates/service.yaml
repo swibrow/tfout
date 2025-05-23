@@ -1,0 +1,19 @@
+{{- if and .Values.metrics.enabled (ne .Values.controller.metricsBindAddress "0") -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tfout.fullname" . }}-metrics
+  labels:
+    {{- include "tfout.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "tfout.selectorLabels" . | nindent 4 }}
+    control-plane: controller-manager
+{{- end }}

@@ -33,7 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	outputsv1alpha1 "tfoutputs.io/terraformoutputs/api/v1alpha1"
+	outputsv1alpha1 "github.com/swibrow/tfout/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 

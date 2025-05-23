@@ -1,0 +1,136 @@
+# Default values for tfout
+replicaCount: 1
+
+image:
+  repository: ghcr.io/swibrow/tfout
+  pullPolicy: IfNotPresent
+  tag: "0.1.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+
+# Controller configuration
+controller:
+  # Enable leader election for high availability
+  leaderElection: true
+  # Health probe bind address
+  healthProbeBindAddress: ":8081"
+  # Metrics bind address (set to "0" to disable)
+  metricsBindAddress: ":8080"
+  # Enable secure metrics serving
+  secureMetrics: false
+  # Enable HTTP/2
+  enableHTTP2: false
+  # Log level (development mode)
+  logLevel: "info"
+  # Development mode for logging
+  development: false
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+
+metrics:
+  enabled: true
+  port: 8080
+  path: /metrics
+
+resources:
+  {}
+  # limits:
+  #   cpu: 500m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 10m
+  #   memory: 64Mi
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8081
+  initialDelaySeconds: 15
+  periodSeconds: 20
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 8081
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+# Environment variables to pass to the controller
+env:
+  []
+  # - name: AWS_REGION
+  #   value: "us-west-2"
+  # - name: AWS_ACCESS_KEY_ID
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: aws-credentials
+  #       key: access-key-id
+
+# Environment variables from ConfigMaps and Secrets
+envFrom:
+  []
+  # - configMapRef:
+  #     name: aws-config
+  # - secretRef:
+  #     name: aws-credentials
+
+# Additional volumes to mount into the controller pod
+volumes: []
+
+# Additional volume mounts for the controller container
+volumeMounts: []
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Priority class for the pod
+priorityClassName: ""
+
+# Termination grace period
+terminationGracePeriodSeconds: 10
+
+# RBAC configuration
+rbac:
+  create: true
+
+# CRD installation
+crds:
+  install: true
+  keep: false
