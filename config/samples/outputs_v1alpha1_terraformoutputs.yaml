@@ -1,0 +1,16 @@
+# config/samples/outputs_v1alpha1_terraformoutputs.yaml
+apiVersion: outputs.tfoutputs.io/v1alpha1
+kind: TerraformOutputs
+metadata:
+  name: test-terraform-outputs
+  namespace: default
+spec:
+  s3Backend:
+    bucket: "test-tf-operator" # Replace with your bucket
+    key: "test/terraform.tfstate"
+    region: "eu-central-1" # Replace with your region
+  syncInterval: "30s" # Fast sync for testing
+  target:
+    namespace: "default"
+    configMapName: "terraform-outputs"
+    secretName: "terraform-secrets"

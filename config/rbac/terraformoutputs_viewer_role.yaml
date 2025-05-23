@@ -1,0 +1,23 @@
+# permissions for end users to view terraformoutputs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: tf-outputs-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: terraformoutputs-viewer-role
+rules:
+- apiGroups:
+  - outputs.tfoutputs.io
+  resources:
+  - terraformoutputs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - outputs.tfoutputs.io
+  resources:
+  - terraformoutputs/status
+  verbs:
+  - get
