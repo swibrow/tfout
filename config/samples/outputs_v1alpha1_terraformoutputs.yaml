@@ -1,0 +1,17 @@
+# config/samples/outputs_v1alpha1_terraformoutputs.yaml
+apiVersion: outputs.tfoutputs.io/v1alpha1
+kind: TerraformOutputs
+metadata:
+  name: test-terraform-outputs
+spec:
+  s3Backend:
+    bucket: "your-test-bucket"
+    key: "test/terraform.tfstate"
+    region: "us-west-2"
+  syncInterval: "30s" # Fast for testing
+  target:
+    namespace: "default"
+    configMapName: "terraform-outputs"
+    secretName: "terraform-secrets"
+    sensitiveKeys:
+      - "database_password"
