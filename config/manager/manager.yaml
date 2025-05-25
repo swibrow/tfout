@@ -5,13 +5,12 @@ metadata:
     control-plane: controller-manager
     app.kubernetes.io/name: tfout
     app.kubernetes.io/managed-by: kustomize
-  name: system
+  name: tfout
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: system
   labels:
     control-plane: controller-manager
     app.kubernetes.io/name: tfout
@@ -42,8 +41,6 @@ spec:
       #             values:
       #               - amd64
       #               - arm64
-      #               - ppc64le
-      #               - s390x
       #           - key: kubernetes.io/os
       #             operator: In
       #             values:
@@ -64,6 +61,7 @@ spec:
             - --leader-elect
             - --health-probe-bind-address=:8081
           image: controller:latest
+          imagePullPolicy: IfNotPresent
           name: manager
           securityContext:
             allowPrivilegeEscalation: false
