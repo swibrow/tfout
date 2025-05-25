@@ -5,23 +5,37 @@
   ],
   "packageRules": [
     {
-      "matchManagers": ["gomod"],
+      "matchCategories": [
+        "docker"
+      ],
+      "enabled": true
+    },
+    {
+      "matchManagers": [
+        "gomod"
+      ],
       "semanticCommitType": "deps",
       "semanticCommitScope": "deps"
     },
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "semanticCommitType": "ci",
       "semanticCommitScope": "actions"
     },
     {
-      "matchManagers": ["dockerfile"],
+      "matchManagers": [
+        "dockerfile"
+      ],
       "semanticCommitType": "docker",
       "semanticCommitScope": "docker"
     }
   ],
   "prConcurrentLimit": 5,
-  "schedule": ["before 3am on Monday"],
+  "schedule": [
+    "before 3am on Monday"
+  ],
   "timezone": "UTC",
   "postUpdateOptions": [
     "gomodTidy",
@@ -31,9 +45,6 @@
     "enabled": true
   },
   "github-actions": {
-    "enabled": true
-  },
-  "docker": {
     "enabled": true
   }
 }
